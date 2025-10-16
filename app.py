@@ -8,7 +8,7 @@ from datetime import datetime
 # Get ThingSpeak secrets from Streamlit's secret management
 THINGSPEAK_CHANNEL_ID = st.secrets["thingspeak"]["3074280"]
 THINGSPEAK_READ_API_KEY = st.secrets["thingspeak"]["ZU0E71HE51M2QNC7"]
-THINGSPEAK_URL = https://api.thingspeak.com/channels/3074280/feeds.json?results=2
+THINGSPEAK_URL = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
 
 # Open-Meteo Configuration for Nagpur, India (No API Key needed)
 NAGPUR_LAT = 21.1458
@@ -172,6 +172,7 @@ if not farm_data.empty:
         st.dataframe(farm_data)
 else:
     st.info("Waiting for farm data to display visualizations.")
+
 
 
 
