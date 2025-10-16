@@ -5,9 +5,9 @@ import plotly.express as px
 from datetime import datetime
 
 # --- Configuration ---
-# Get ThingSpeak secrets from Streamlit's secret management
-THINGSPEAK_CHANNEL_ID = st.secrets["thingspeak"]["3074280"]
-THINGSPEAK_READ_API_KEY = st.secrets["thingspeak"]["ZU0E71HE51M2QNC7"]
+# Get ThingSpeak secrets from Streamlit's secret management# Correct lines for app.py
+THINGSPEAK_CHANNEL_ID = st.secrets["TS_CHANNEL_ID"]
+THINGSPEAK_READ_API_KEY = st.secrets["TS_API_KEY"]
 THINGSPEAK_URL = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
 
 # Open-Meteo Configuration for Nagpur, India (No API Key needed)
@@ -172,6 +172,7 @@ if not farm_data.empty:
         st.dataframe(farm_data)
 else:
     st.info("Waiting for farm data to display visualizations.")
+
 
 
 
