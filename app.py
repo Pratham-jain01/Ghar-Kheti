@@ -13,6 +13,7 @@ st.set_page_config(
 )
 
 # --- Secrets and API Configuration ---
+# Make sure to set these in your Streamlit Cloud secrets
 THINGSPEAK_CHANNEL_ID = st.secrets["TS_CHANNEL_ID"]
 THINGSPEAK_READ_API_KEY = st.secrets["TS_API_KEY"]
 THINGSPEAK_URL = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
@@ -29,18 +30,29 @@ def get_thingspeak_data(num_results=8000):
         data = response.json()
 
         if 'feeds' not in data or not data['feeds']:
+            st.warning("No data found in ThingSpeak channel.")
             return pd.DataFrame()
 
         df = pd.DataFrame(data['feeds'])
-        field_mapping = {'field1': 'Temperature', 'field2': 'Humidity', 'field3': 'Soil_Moisture', 'field4': 'pH'}
+        # Standard field mapping for ThingSpeak
+        field_mapping = {
+            'field1': 'Temperature', 
+            'field2': 'Humidity', 
+            'field3': 'Soil_Moisture', 
+            'field4': 'pH'
+        }
         df = df.rename(columns=field_mapping)
         
+        # Convert all potential sensor columns to numeric types
         for col in field_mapping.values():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
+        # Convert 'created_at' to datetime, set timezone, and make it the index
         df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Kolkata')
         df.set_index('created_at', inplace=True)
+        
+        # Drop rows where essential data is missing
         return df.dropna(subset=['Temperature', 'Humidity', 'Soil_Moisture'])
 
     except (requests.exceptions.RequestException, KeyError, ValueError) as e:
@@ -72,11 +84,10 @@ else:
     # --- Sidebar for Controls ---
     st.sidebar.header("Dashboard Controls")
     
-    # Date Range Selector
     min_date = farm_data.index.min().date()
     max_date = farm_data.index.max().date()
     
-    # Robust date range calculation
+    # Set a robust default date range
     default_start_date = max(min_date, max_date - timedelta(days=6))
 
     date_range = st.sidebar.date_input(
@@ -86,14 +97,15 @@ else:
         max_value=max_date,
     )
     
-    # Handle date range selection
+    # Filter data based on date range, ensuring timezone awareness
     if len(date_range) == 2:
         start_date, end_date = date_range
-        start_datetime = pd.to_datetime(start_date)
-        end_datetime = pd.to_datetime(end_date) + pd.Timedelta(days=1)
+        start_datetime = pd.Timestamp(start_date, tz='Asia/Kolkata')
+        end_datetime = pd.Timestamp(end_date, tz='Asia/Kolkata') + pd.Timedelta(days=1)
         filtered_data = farm_data.loc[start_datetime:end_datetime]
     else:
-        filtered_data = farm_data # Show all data if range is incomplete
+        # If date range is not fully selected, use all data
+        filtered_data = farm_data
 
     # --- Main Dashboard Layout ---
     st.subheader("Key Metrics")
@@ -108,16 +120,14 @@ else:
     
     st.divider()
 
-    # --- Charts ---
+    # --- Charts for EDA ---
     st.subheader("Exploratory Data Analysis (EDA)")
     
-    # 1. Time Series Chart
     st.markdown("### Sensor Trends Over Time")
     sensor_to_plot = st.selectbox("Select a sensor for the time series chart:", filtered_data.columns)
     fig_line = px.line(filtered_data, y=sensor_to_plot, title=f"{sensor_to_plot} Over Time", template="plotly_white")
     st.plotly_chart(fig_line, use_container_width=True)
 
-    # 2. Data Distribution and Correlation
     st.markdown("### Data Distribution & Correlation")
     col_hist, col_scatter = st.columns(2)
     with col_hist:
@@ -131,7 +141,6 @@ else:
         fig_scatter = px.scatter(filtered_data, x=x_axis, y=y_axis, title=f"{x_axis} vs. {y_axis}", trendline="ols")
         st.plotly_chart(fig_scatter, use_container_width=True)
 
-    # Raw Data Expander
     with st.expander("Show Filtered Data Table"):
         st.dataframe(filtered_data)
 
