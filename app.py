@@ -2,20 +2,26 @@ import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
-from datetime import datetime
+from datetime import datetime, timedelta
+import plotly.graph_objects as go
 
-# --- Configuration ---
-st.set_page_config(page_title="Ghar-Kheti Dashboard", layout="wide")
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="Ghar-Kheti Analytics Dashboard",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-# Get ThingSpeak secrets using the simpler secret names
+# --- Secrets and API Configuration ---
 THINGSPEAK_CHANNEL_ID = st.secrets["TS_CHANNEL_ID"]
 THINGSPEAK_READ_API_KEY = st.secrets["TS_API_KEY"]
 THINGSPEAK_URL = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/feeds.json"
+WEATHER_URL = "https://api.open-meteo.com/v1/forecast"
 
-# --- Helper Functions ---
-@st.cache_data(ttl=300) # Cache data for 5 minutes
-def get_thingspeak_data(num_results=2880): # Fetch last 24 hours of data (assuming 1 reading/min)
-    """Fetches a specified number of data points from the ThingSpeak channel."""
+# --- Data Fetching Functions with Caching ---
+@st.cache_data(ttl=600)  # Cache ThingSpeak data for 10 minutes
+def get_thingspeak_data(num_results=8000):
+    """Fetches and processes the last 8000 data points from ThingSpeak."""
     try:
         params = {'api_key': THINGSPEAK_READ_API_KEY, 'results': num_results}
         response = requests.get(THINGSPEAK_URL, params=params)
@@ -23,121 +29,109 @@ def get_thingspeak_data(num_results=2880): # Fetch last 24 hours of data (assumi
         data = response.json()
 
         if 'feeds' not in data or not data['feeds']:
-            st.warning("No data found in the ThingSpeak channel.")
             return pd.DataFrame()
 
         df = pd.DataFrame(data['feeds'])
         field_mapping = {'field1': 'Temperature', 'field2': 'Humidity', 'field3': 'Soil_Moisture', 'field4': 'pH'}
         df = df.rename(columns=field_mapping)
-
+        
         for col in field_mapping.values():
             if col in df.columns:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
-
+        
         df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Kolkata')
-        df = df.dropna(subset=['Temperature', 'Humidity', 'Soil_Moisture'])
-        return df
+        df.set_index('created_at', inplace=True)
+        return df.dropna(subset=['Temperature', 'Humidity', 'Soil_Moisture'])
 
+    except (requests.exceptions.RequestException, KeyError, ValueError) as e:
+        st.error(f"Error fetching or parsing ThingSpeak data: {e}")
+        return pd.DataFrame()
+
+@st.cache_data(ttl=1800) # Cache weather data for 30 minutes
+def get_weather_data(lat=21.1458, lon=79.0882):
+    """Fetches live weather data for Nagpur from Open-Meteo."""
+    params = {'latitude': lat, 'longitude': lon, 'current_weather': 'true'}
+    try:
+        response = requests.get(WEATHER_URL, params=params)
+        response.raise_for_status()
+        return response.json().get('current_weather', {})
     except requests.exceptions.RequestException as e:
-        st.error(f"Error fetching data from ThingSpeak: {e}")
-        return pd.DataFrame()
-    except (KeyError, ValueError) as e:
-        st.error(f"Error parsing ThingSpeak data. Check channel configuration. Error: {e}")
-        return pd.DataFrame()
+        st.error(f"Error fetching weather data: {e}")
+        return {}
 
-def convert_to_percentage(raw_val, min_val, max_val):
-    """Converts a raw sensor value to a percentage, handling inverse relationships."""
-    # Ensure max_val is greater than min_val to avoid division by zero or incorrect logic
-    if max_val <= min_val:
-        return 0.0
-        
-    # Clamp the value to be within the calibrated range
-    clamped_val = max(min(raw_val, max_val), min_val)
-    # Calculate percentage (assuming lower value means more moisture for capacitive sensors)
-    percentage = 100 * (max_val - clamped_val) / (max_val - min_val)
-    return max(0, min(percentage, 100)) # Ensure percentage is between 0 and 100
+# --- Main Application ---
+st.title("🏡 Ghar-Kheti: Advanced Analytics Dashboard")
 
-# --- Main App Layout ---
-
-st.title("🏡 Ghar-Kheti: Live Farm Monitoring")
-st.markdown("A real-time dashboard for your automated rooftop farming system.")
-
-# --- Sensor Calibration Section ---
-st.subheader("🛠️ Soil Moisture Sensor Calibration")
-st.info("To get an accurate percentage, calibrate your sensor. Note the reading when the soil is completely dry and when it's fully saturated with water.")
-
-cal_col1, cal_col2 = st.columns(2)
-with cal_col1:
-    # Most capacitive sensors show a higher value when dry.
-    dry_value = st.number_input("Enter Sensor Value for Dry Soil (0% Moisture):", value=3300, step=10)
-with cal_col2:
-    # And a lower value when wet.
-    wet_value = st.number_input("Enter Sensor Value for Wet Soil (100% Moisture):", value=1300, step=10)
-
-# --- Fetch and Process Data ---
+# Fetch data
 farm_data = get_thingspeak_data()
+weather_data = get_weather_data()
 
-if not farm_data.empty:
-    # Apply the conversion to the Soil_Moisture column
-    # We use the wet_value as the min and dry_value as the max for the conversion function
-    farm_data['Soil_Moisture_Percent'] = farm_data['Soil_Moisture'].apply(
-        lambda x: convert_to_percentage(x, wet_value, dry_value)
-    )
-
-    # --- Live Metrics Section ---
-    st.subheader("📊 Current Sensor Readings")
-    latest_data = farm_data.iloc[-1]
+if farm_data.empty:
+    st.warning("Could not fetch farm data. Please check your ThingSpeak secrets and channel status.")
+else:
+    # --- Sidebar for Controls ---
+    st.sidebar.header("Dashboard Controls")
     
+    # Date Range Selector
+    min_date = farm_data.index.min().date()
+    max_date = farm_data.index.max().date()
+    
+    # Robust date range calculation
+    default_start_date = max(min_date, max_date - timedelta(days=6))
+
+    date_range = st.sidebar.date_input(
+        "Select Date Range",
+        value=(default_start_date, max_date),
+        min_value=min_date,
+        max_value=max_date,
+    )
+    
+    # Handle date range selection
+    if len(date_range) == 2:
+        start_date, end_date = date_range
+        start_datetime = pd.to_datetime(start_date)
+        end_datetime = pd.to_datetime(end_date) + pd.Timedelta(days=1)
+        filtered_data = farm_data.loc[start_datetime:end_datetime]
+    else:
+        filtered_data = farm_data # Show all data if range is incomplete
+
+    # --- Main Dashboard Layout ---
+    st.subheader("Key Metrics")
     col1, col2, col3 = st.columns(3)
-
     with col1:
-        st.metric(
-            "Soil Moisture", 
-            f"{latest_data['Soil_Moisture_Percent']:.1f} %",
-            help="The calibrated moisture content of the soil."
-        )
-
+        st.metric("Latest Temperature", f"{farm_data['Temperature'].iloc[-1]:.1f} °C")
     with col2:
-        st.metric("Temperature", f"{latest_data['Temperature']:.1f} °C")
-        
+        st.metric("Latest Humidity", f"{farm_data['Humidity'].iloc[-1]:.1f} %")
     with col3:
-        st.metric("Humidity", f"{latest_data['Humidity']:.1f} %")
-
+        if weather_data:
+            st.metric("Live Weather (Nagpur)", f"{weather_data.get('temperature')} °C")
+    
     st.divider()
 
-    # --- Historical Data Chart ---
-    st.subheader("📈 Sensor Data Over Time")
+    # --- Charts ---
+    st.subheader("Exploratory Data Analysis (EDA)")
     
-    sensor_options = {
-        'Soil Moisture (%)': 'Soil_Moisture_Percent',
-        'Temperature (°C)': 'Temperature',
-        'Humidity (%)': 'Humidity',
-        'pH Level': 'pH'
-    }
-    
-    selected_display_name = st.selectbox(
-        "Select a sensor to visualize its history:",
-        options=list(sensor_options.keys())
-    )
-    
-    sensor_to_plot = sensor_options[selected_display_name]
-    
-    if sensor_to_plot in farm_data.columns and not farm_data[sensor_to_plot].isnull().all():
-        fig = px.line(
-            farm_data,
-            x='created_at',
-            y=sensor_to_plot,
-            title=f"Historical Readings for {selected_display_name}",
-            labels={'created_at': 'Time (Local)', sensor_to_plot: selected_display_name},
-            template="plotly_white"
-        )
-        st.plotly_chart(fig, use_container_width=True)
-    else:
-        st.warning(f"Data for '{selected_display_name}' is not available to plot.")
+    # 1. Time Series Chart
+    st.markdown("### Sensor Trends Over Time")
+    sensor_to_plot = st.selectbox("Select a sensor for the time series chart:", filtered_data.columns)
+    fig_line = px.line(filtered_data, y=sensor_to_plot, title=f"{sensor_to_plot} Over Time", template="plotly_white")
+    st.plotly_chart(fig_line, use_container_width=True)
 
-    with st.expander("Show Raw and Calibrated Data Table"):
-        st.dataframe(farm_data.sort_values(by='created_at', ascending=False))
+    # 2. Data Distribution and Correlation
+    st.markdown("### Data Distribution & Correlation")
+    col_hist, col_scatter = st.columns(2)
+    with col_hist:
+        hist_sensor = st.selectbox("Select sensor for histogram:", filtered_data.columns, key='hist')
+        fig_hist = px.histogram(filtered_data, x=hist_sensor, title=f"Distribution of {hist_sensor}", nbins=50, template="plotly_white")
+        st.plotly_chart(fig_hist, use_container_width=True)
 
-else:
-    st.info("Attempting to fetch data... Please wait.")
+    with col_scatter:
+        x_axis = st.selectbox("Select X-axis for scatter plot:", filtered_data.columns, key='scatter_x', index=0)
+        y_axis = st.selectbox("Select Y-axis for scatter plot:", filtered_data.columns, key='scatter_y', index=1)
+        fig_scatter = px.scatter(filtered_data, x=x_axis, y=y_axis, title=f"{x_axis} vs. {y_axis}", trendline="ols")
+        st.plotly_chart(fig_scatter, use_container_width=True)
+
+    # Raw Data Expander
+    with st.expander("Show Filtered Data Table"):
+        st.dataframe(filtered_data)
 
