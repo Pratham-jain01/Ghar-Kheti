@@ -1,4 +1,4 @@
-mport streamlit as st
+import streamlit as st
 import pandas as pd
 import requests
 import plotly.express as px
@@ -193,3 +193,4 @@ with st.expander("Show Raw Data"):
         st.dataframe(farm_data)
     else:
         st.write("No data to display.")
+
