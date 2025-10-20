@@ -14,8 +14,8 @@ THINGSPEAK_URL = f"https://api.thingspeak.com/channels/{THINGSPEAK_CHANNEL_ID}/f
 
 # --- Helper Functions ---
 @st.cache_data(ttl=300) # Cache data for 5 minutes
-def get_thingspeak_data(num_results=2880):
-    """Fetches and processes data from the ThingSpeak channel."""
+def get_thingspeak_data(num_results=2880): # Fetch last 24 hours of data (assuming 1 reading/min)
+    """Fetches a specified number of data points from the ThingSpeak channel."""
     try:
         params = {'api_key': THINGSPEAK_READ_API_KEY, 'results': num_results}
         response = requests.get(THINGSPEAK_URL, params=params)
@@ -37,124 +37,98 @@ def get_thingspeak_data(num_results=2880):
         df['created_at'] = pd.to_datetime(df['created_at']).dt.tz_convert('Asia/Kolkata')
         df = df.dropna(subset=['Temperature', 'Humidity', 'Soil_Moisture'])
         return df
-    except Exception as e:
-        st.error(f"An error occurred: {e}")
+
+    except requests.exceptions.RequestException as e:
+        st.error(f"Error fetching data from ThingSpeak: {e}")
+        return pd.DataFrame()
+    except (KeyError, ValueError) as e:
+        st.error(f"Error parsing ThingSpeak data. Check channel configuration. Error: {e}")
         return pd.DataFrame()
 
-# --- Data Interpretation Functions ---
-def interpret_temperature(temp):
-    """Returns a user-friendly description for a temperature value."""
-    if temp < 15: return "Cold"
-    if 15 <= temp < 20: return "Cool"
-    if 20 <= temp < 28: return "Optimal"
-    if 28 <= temp < 35: return "Warm"
-    return "Hot"
-
-def interpret_humidity(hum):
-    """Returns a user-friendly description for a humidity value."""
-    if hum < 40: return "Dry"
-    if 40 <= hum < 60: return "Optimal"
-    if 60 <= hum < 80: return "Humid"
-    return "Very Humid"
-
-def interpret_ph(ph_val):
-    """Returns a user-friendly description for a pH value."""
-    if not 0 <= ph_val <= 14: return "Invalid"
-    if ph_val < 5.5: return "Very Acidic"
-    if 5.5 <= ph_val < 6.5: return "Acidic"
-    if 6.5 <= ph_val < 7.5: return "Neutral"
-    return "Alkaline"
-
-def convert_soil_moisture_to_percent(raw_val, dry_val, wet_val):
-    """Converts raw soil moisture to a percentage based on calibration."""
-    if dry_val == wet_val: return 0.0 # Avoid division by zero
-    # Clamp the value within the calibrated range
-    clamped_val = max(min(raw_val, dry_val), wet_val)
-    # Calculate percentage (assuming lower raw value means more moisture)
-    percentage = 100 * (dry_val - clamped_val) / (dry_val - wet_val)
+def convert_to_percentage(raw_val, min_val, max_val):
+    """Converts a raw sensor value to a percentage, handling inverse relationships."""
+    # Ensure max_val is greater than min_val to avoid division by zero or incorrect logic
+    if max_val <= min_val:
+        return 0.0
+        
+    # Clamp the value to be within the calibrated range
+    clamped_val = max(min(raw_val, max_val), min_val)
+    # Calculate percentage (assuming lower value means more moisture for capacitive sensors)
+    percentage = 100 * (max_val - clamped_val) / (max_val - min_val)
     return max(0, min(percentage, 100)) # Ensure percentage is between 0 and 100
 
-
 # --- Main App Layout ---
+
 st.title("🏡 Ghar-Kheti: Live Farm Monitoring")
 st.markdown("A real-time dashboard for your automated rooftop farming system.")
 
 # --- Sensor Calibration Section ---
-with st.expander("🛠️ Calibrate Your Soil Moisture Sensor"):
-    st.info("To get an accurate moisture percentage, note the sensor's raw reading when the soil is completely dry and when it's fully saturated with water.")
-    cal_col1, cal_col2 = st.columns(2)
-    with cal_col1:
-        dry_value = st.number_input("Enter Sensor Value for Dry Soil (0% Moisture):", value=3300, step=10)
-    with cal_col2:
-        wet_value = st.number_input("Enter Sensor Value for Wet Soil (100% Moisture):", value=1300, step=10)
+st.subheader("🛠️ Soil Moisture Sensor Calibration")
+st.info("To get an accurate percentage, calibrate your sensor. Note the reading when the soil is completely dry and when it's fully saturated with water.")
+
+cal_col1, cal_col2 = st.columns(2)
+with cal_col1:
+    # Most capacitive sensors show a higher value when dry.
+    dry_value = st.number_input("Enter Sensor Value for Dry Soil (0% Moisture):", value=3300, step=10)
+with cal_col2:
+    # And a lower value when wet.
+    wet_value = st.number_input("Enter Sensor Value for Wet Soil (100% Moisture):", value=1300, step=10)
 
 # --- Fetch and Process Data ---
 farm_data = get_thingspeak_data()
 
 if not farm_data.empty:
+    # Apply the conversion to the Soil_Moisture column
+    # We use the wet_value as the min and dry_value as the max for the conversion function
     farm_data['Soil_Moisture_Percent'] = farm_data['Soil_Moisture'].apply(
-        lambda x: convert_soil_moisture_to_percent(x, dry_value, wet_value)
+        lambda x: convert_to_percentage(x, wet_value, dry_value)
     )
 
     # --- Live Metrics Section ---
-    st.subheader("📊 Current Conditions")
+    st.subheader("📊 Current Sensor Readings")
     latest_data = farm_data.iloc[-1]
     
-    col1, col2, col3, col4 = st.columns(4)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
         st.metric(
-            label="Soil Moisture",
-            value=f"{latest_data['Soil_Moisture_Percent']:.1f} %",
-            delta=f"Raw: {latest_data['Soil_Moisture']}",
-            delta_color="off"
+            "Soil Moisture", 
+            f"{latest_data['Soil_Moisture_Percent']:.1f} %",
+            help="The calibrated moisture content of the soil."
         )
 
     with col2:
-        st.metric(
-            label="Temperature",
-            value=f"{latest_data['Temperature']:.1f} °C",
-            delta=interpret_temperature(latest_data['Temperature'])
-        )
+        st.metric("Temperature", f"{latest_data['Temperature']:.1f} °C")
         
     with col3:
-        st.metric(
-            label="Humidity",
-            value=f"{latest_data['Humidity']:.1f} %",
-            delta=interpret_humidity(latest_data['Humidity'])
-        )
-
-    with col4:
-        if 'pH' in latest_data and pd.notna(latest_data['pH']):
-            st.metric(
-                label="Soil pH",
-                value=f"{latest_data['pH']:.1f}",
-                delta=interpret_ph(latest_data['pH'])
-            )
-        else:
-            st.metric(label="Soil pH", value="N/A", delta="No data")
+        st.metric("Humidity", f"{latest_data['Humidity']:.1f} %")
 
     st.divider()
 
     # --- Historical Data Chart ---
     st.subheader("📈 Sensor Data Over Time")
+    
     sensor_options = {
         'Soil Moisture (%)': 'Soil_Moisture_Percent',
         'Temperature (°C)': 'Temperature',
         'Humidity (%)': 'Humidity',
         'pH Level': 'pH'
     }
+    
     selected_display_name = st.selectbox(
         "Select a sensor to visualize its history:",
         options=list(sensor_options.keys())
     )
+    
     sensor_to_plot = sensor_options[selected_display_name]
     
     if sensor_to_plot in farm_data.columns and not farm_data[sensor_to_plot].isnull().all():
         fig = px.line(
-            farm_data, x='created_at', y=sensor_to_plot,
+            farm_data,
+            x='created_at',
+            y=sensor_to_plot,
             title=f"Historical Readings for {selected_display_name}",
-            labels={'created_at': 'Time', sensor_to_plot: selected_display_name},
+            labels={'created_at': 'Time (Local)', sensor_to_plot: selected_display_name},
             template="plotly_white"
         )
         st.plotly_chart(fig, use_container_width=True)
@@ -165,5 +139,5 @@ if not farm_data.empty:
         st.dataframe(farm_data.sort_values(by='created_at', ascending=False))
 
 else:
-    st.info("Awaiting data from ThingSpeak...")
+    st.info("Attempting to fetch data... Please wait.")
 
