@@ -127,9 +127,21 @@ if not farm_data.empty:
     # Date Range Selector
     min_date = farm_data['created_at'].min().date()
     max_date = farm_data['created_at'].max().date()
+
+    # --- FIX: Validate the date range before creating the widget ---
+    # This prevents the StreamlitAPIException error if the data spans less than 7 days.
+    if min_date >= max_date:
+        # Handle case with only one day of data
+        start_date_value = min_date
+        end_date_value = max_date
+    else:
+        # Set default start date to 7 days ago, but not before the earliest data point
+        start_date_value = max(min_date, max_date - timedelta(days=7))
+        end_date_value = max_date
+
     date_range = st.sidebar.date_input(
         "Select Date Range",
-        value=(max_date - timedelta(days=7), max_date),
+        value=(start_date_value, end_date_value), # Use validated default values
         min_value=min_date,
         max_value=max_date,
     )
