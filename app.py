@@ -60,8 +60,8 @@ def get_thingspeak_data(num_results=8000):
         return pd.DataFrame()
 
 @st.cache_data(ttl=1800) # Cache weather data for 30 minutes
-def get_weather_data(lat=21.1458, lon=79.0882):
-    """Fetches live weather data for Nagpur from Open-Meteo."""
+def get_weather_data(lat=17.6599, lon=75.9064): # <-- CHANGED: Coordinates for Solapur
+    """Fetches live weather data for Solapur from Open-Meteo."""
     params = {'latitude': lat, 'longitude': lon, 'current_weather': 'true'}
     try:
         response = requests.get(WEATHER_URL, params=params)
@@ -82,6 +82,10 @@ if farm_data.empty:
     st.warning("Could not fetch farm data. Please check your ThingSpeak secrets and channel status.")
 else:
     # --- Sidebar for Controls ---
+    
+    # --- ADDED: Project Image ---
+    st.sidebar.image("image_7e8cfd.png", use_column_width=True) 
+    
     st.sidebar.header("Dashboard Controls")
     
     min_date = farm_data.index.min().date()
@@ -116,7 +120,8 @@ else:
         st.metric("Latest Humidity", f"{farm_data['Humidity'].iloc[-1]:.1f} %")
     with col3:
         if weather_data:
-            st.metric("Live Weather (Nagpur)", f"{weather_data.get('temperature')} °C")
+            # --- CHANGED: Label to Solapur ---
+            st.metric("Live Weather (Solapur)", f"{weather_data.get('temperature')} °C") 
     
     st.divider()
 
@@ -124,23 +129,35 @@ else:
     st.subheader("Exploratory Data Analysis (EDA)")
     
     st.markdown("### Sensor Trends Over Time")
-    sensor_to_plot = st.selectbox("Select a sensor for the time series chart:", filtered_data.columns)
-    fig_line = px.line(filtered_data, y=sensor_to_plot, title=f"{sensor_to_plot} Over Time", template="plotly_white")
-    st.plotly_chart(fig_line, use_container_width=True)
+    # Check if filtered_data is empty before plotting
+    if not filtered_data.empty:
+        sensor_to_plot = st.selectbox("Select a sensor for the time series chart:", filtered_data.columns)
+        if sensor_to_plot:
+            fig_line = px.line(filtered_data, y=sensor_to_plot, title=f"{sensor_to_plot} Over Time", template="plotly_white")
+            st.plotly_chart(fig_line, use_container_width=True)
+    else:
+        st.warning("No data available for the selected date range.")
+
 
     st.markdown("### Data Distribution & Correlation")
     col_hist, col_scatter = st.columns(2)
-    with col_hist:
-        hist_sensor = st.selectbox("Select sensor for histogram:", filtered_data.columns, key='hist')
-        fig_hist = px.histogram(filtered_data, x=hist_sensor, title=f"Distribution of {hist_sensor}", nbins=50, template="plotly_white")
-        st.plotly_chart(fig_hist, use_container_width=True)
+    
+    if not filtered_data.empty:
+        with col_hist:
+            hist_sensor = st.selectbox("Select sensor for histogram:", filtered_data.columns, key='hist')
+            if hist_sensor:
+                fig_hist = px.histogram(filtered_data, x=hist_sensor, title=f"Distribution of {hist_sensor}", nbins=50, template="plotly_white")
+                st.plotly_chart(fig_hist, use_container_width=True)
 
-    with col_scatter:
-        x_axis = st.selectbox("Select X-axis for scatter plot:", filtered_data.columns, key='scatter_x', index=0)
-        y_axis = st.selectbox("Select Y-axis for scatter plot:", filtered_data.columns, key='scatter_y', index=1)
-        fig_scatter = px.scatter(filtered_data, x=x_axis, y=y_axis, title=f"{x_axis} vs. {y_axis}", trendline="ols")
-        st.plotly_chart(fig_scatter, use_container_width=True)
+        with col_scatter:
+            x_axis = st.selectbox("Select X-axis for scatter plot:", filtered_data.columns, key='scatter_x', index=0)
+            y_axis = st.selectbox("Select Y-axis for scatter plot:", filtered_data.columns, key='scatter_y', index=1)
+            if x_axis and y_axis:
+                fig_scatter = px.scatter(filtered_data, x=x_axis, y=y_axis, title=f"{x_axis} vs. {y_axis}", trendline="ols")
+                st.plotly_chart(fig_scatter, use_container_width=True)
+    else:
+        st.info("Charts hidden because no data is available for the selected range.")
+
 
     with st.expander("Show Filtered Data Table"):
-        st.dataframe(filtered_data)
-
+        st.dataframe(filtered_service_data)
