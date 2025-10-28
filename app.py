@@ -60,13 +60,20 @@ def get_thingspeak_data(num_results=8000):
         return pd.DataFrame()
 
 @st.cache_data(ttl=1800) # Cache weather data for 30 minutes
-def get_weather_data(lat=17.6599, lon=75.9064): # <-- CHANGED: Coordinates for Solapur
+def get_weather_data(lat=17.6599, lon=75.9064): # Coordinates for Solapur
     """Fetches live weather data for Solapur from Open-Meteo."""
-    params = {'latitude': lat, 'longitude': lon, 'current_weather': 'true'}
+    
+    # --- CHANGED: Requested more current weather variables ---
+    params = {
+        'latitude': lat, 
+        'longitude': lon, 
+        'current': 'temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,wind_speed_10m,wind_direction_10m'
+    }
     try:
         response = requests.get(WEATHER_URL, params=params)
         response.raise_for_status()
-        return response.json().get('current_weather', {})
+        # Return the whole JSON response which includes 'current' and 'current_units'
+        return response.json() 
     except requests.exceptions.RequestException as e:
         st.error(f"Error fetching weather data: {e}")
         return {}
@@ -83,8 +90,7 @@ if farm_data.empty:
 else:
     # --- Sidebar for Controls ---
     
-    # --- ADDED: Project Image ---
-    st.sidebar.image("image_7e8cfd.png", use_column_width=True) 
+    # --- REMOVED: st.sidebar.image() which caused the error ---
     
     st.sidebar.header("Dashboard Controls")
     
@@ -112,16 +118,46 @@ else:
         filtered_data = farm_data
 
     # --- Main Dashboard Layout ---
-    st.subheader("Key Metrics")
-    col1, col2, col3 = st.columns(3)
+    
+    # --- UPDATED: Key Metrics section for Farm Data only ---
+    st.subheader("Key Metrics (Live Farm Data)")
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        st.metric("Latest Temperature", f"{farm_data['Temperature'].iloc[-1]:.1f} °C")
+        st.metric("Latest Farm Temp", f"{farm_data['Temperature'].iloc[-1]:.1f} °C")
     with col2:
-        st.metric("Latest Humidity", f"{farm_data['Humidity'].iloc[-1]:.1f} %")
+        st.metric("Latest Farm Humidity", f"{farm_data['Humidity'].iloc[-1]:.1f} %")
     with col3:
-        if weather_data:
-            # --- CHANGED: Label to Solapur ---
-            st.metric("Live Weather (Solapur)", f"{weather_data.get('temperature')} °C") 
+        st.metric("Latest Soil Moisture", f"{farm_data['Soil_Moisture'].iloc[-1]:.0f}", help="Raw ADC Value")
+    with col4:
+        st.metric("Latest pH", f"{farm_data['pH'].iloc[-1]:.1f}")
+        
+    st.divider()
+
+    # --- ADDED: New section for Live Weather ---
+    st.subheader("Live Weather (Solapur)")
+    if weather_data and 'current' in weather_data:
+        current_data = weather_data.get('current', {})
+        current_units = weather_data.get('current_units', {})
+
+        col_w1, col_w2, col_w3, col_w4 = st.columns(4)
+        with col_w1:
+            temp = current_data.get('temperature_2m', 'N/A')
+            unit = current_units.get('temperature_2m', '')
+            st.metric("Temperature", f"{temp} {unit}")
+        with col_w2:
+            feels_like = current_data.get('apparent_temperature', 'N/A')
+            unit = current_units.get('apparent_temperature', '')
+            st.metric("Feels Like", f"{feels_like} {unit}")
+        with col_w3:
+            precip = current_data.get('precipitation', 'N/A')
+            unit = current_units.get('precipitation', '')
+            st.metric("Precipitation", f"{precip} {unit}")
+        with col_w4:
+            wind = current_data.get('wind_speed_10m', 'N/A')
+            unit = current_units.get('wind_speed_10m', '')
+            st.metric("Wind Speed", f"{wind} {unit}")
+    else:
+        st.warning("Could not load live weather data.")
     
     st.divider()
 
@@ -160,4 +196,5 @@ else:
 
 
     with st.expander("Show Filtered Data Table"):
-        st.dataframe(filtered_service_data)
+        st.dataframe(filtered_data)
+
