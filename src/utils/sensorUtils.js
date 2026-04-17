@@ -1,19 +1,3 @@
-/**
- * sensorUtils.js
- * Pure utility functions for sensor validation, interpretation,
- * actuator state derivation, smart alerts, and activity log generation.
- *
- * ThingSpeak field mapping:
- *   field1 = Soil Moisture (raw analog 0–1023)
- *   field2 = Rain Sensor   (raw analog 0–1023)
- *   field3 = Temperature   (°C, DHT11/22)
- *   field4 = Humidity       (%, DHT11/22)
- *   field5 = pH Sensor     (raw analog 0–1023)
- */
-
-// ─── Sensor Validation ──────────────────────────────────────────────
-// Returns { isValid, errorType, errorMessage } for each sensor
-
 export function validateSoil(raw) {
   if (raw === null || raw === undefined) return { isValid: false, errorType: 'error', errorMessage: 'No data received' };
   if (raw === 0) return { isValid: false, errorType: 'warning', errorMessage: 'Check Sensor ⚠️' };
