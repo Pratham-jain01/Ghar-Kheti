@@ -1,3 +1,19 @@
+/**
+ * sensorUtils.js
+ * Pure utility functions for sensor validation, interpretation,
+ * actuator state derivation, smart alerts, and activity log generation.
+ *
+ * ThingSpeak field mapping:
+ *   field1 = Soil Moisture (raw analog 0–1023)
+ *   field2 = Rain Sensor   (raw analog 0–1023)
+ *   field3 = Temperature   (°C, DHT11/22)
+ *   field4 = Humidity       (%, DHT11/22)
+ *   field5 = pH Sensor     (raw analog 0–1023)
+ */
+
+// ─── Sensor Validation ──────────────────────────────────────────────
+// Returns { isValid, errorType, errorMessage } for each sensor
+
 export function validateSoil(raw) {
   if (raw === null || raw === undefined) return { isValid: false, errorType: 'error', errorMessage: 'No data received' };
   if (raw === 0) return { isValid: false, errorType: 'warning', errorMessage: 'Check Sensor ⚠️' };
@@ -6,7 +22,8 @@ export function validateSoil(raw) {
 
 export function validateHumidity(raw) {
   if (raw === null || raw === undefined) return { isValid: false, errorType: 'error', errorMessage: 'No data received' };
-  if (raw < 0 || raw > 100) return { isValid: false, errorType: 'error', errorMessage: 'Sensor Error ❌' };
+  const val = Math.max(0, Math.min(100, parseFloat(raw)));
+  if (isNaN(val)) return { isValid: false, errorType: 'error', errorMessage: 'Sensor Error ❌' };
   return { isValid: true, errorType: null, errorMessage: null };
 }
 
@@ -42,7 +59,7 @@ export function interpretRain(raw) {
 }
 
 export function interpretTemperature(raw) {
-  if (raw > 32)  return { label: 'High',   emoji: '🔥', color: 'danger',  status: 'high' };
+  if (raw > 36)  return { label: 'High',   emoji: '🔥', color: 'danger',  status: 'high' };
   return                { label: 'Normal', emoji: '✅', color: 'good',    status: 'normal' };
 }
 
