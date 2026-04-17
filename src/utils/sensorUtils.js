@@ -53,8 +53,8 @@ export function interpretSoil(raw) {
 }
 
 export function interpretRain(raw) {
-  if (raw < 800) return { label: 'Rain Detected', emoji: '🌧️', color: 'info',  status: 'rain' };
-  return                { label: 'No Rain',       emoji: '☀️', color: 'good',  status: 'clear' };
+  if (raw < 1500) return { label: 'Rain Detected', emoji: '🌧️', color: 'info',  status: 'rain' };
+  return                 { label: 'No Rain',       emoji: '☀️', color: 'good',  status: 'clear' };
 }
 
 export function interpretTemperature(raw) {
