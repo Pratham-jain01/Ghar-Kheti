@@ -59,15 +59,18 @@ function MetricCard({ config, sensorData }) {
   let statusClass = 'good';
   let statusLabel = 'N/A';
   let displayValue = '--';
+  let detailValue = '--';
 
   if (!isValid) {
     statusClass = errorType === 'error' ? 'error' : 'warning';
     statusLabel = errorMsg || 'Error';
-    displayValue = errorMsg || 'Error';
+    displayValue = '--';
+    detailValue = errorMsg || 'Error';
   } else if (interp) {
     statusClass = interp.color;
     statusLabel = `${interp.label} ${interp.emoji}`;
-    displayValue = `${interp.label} ${interp.emoji}`;
+    displayValue = `${raw ?? '--'}${config.rawUnit}`;
+    detailValue = `${interp.label} ${interp.emoji}`;
   }
 
   const barPercent = isValid && raw != null
@@ -82,6 +85,9 @@ function MetricCard({ config, sensorData }) {
       </div>
       <div className={`metric-value-status ${statusClass}`}>
         {displayValue}
+      </div>
+      <div className={`metric-detail-status ${statusClass}`}>
+        {detailValue}
       </div>
       {isValid && raw != null && (
         <div className="metric-raw">

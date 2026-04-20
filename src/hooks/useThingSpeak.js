@@ -8,9 +8,9 @@ const BASE_URL = `https://api.thingspeak.com/channels/${CHANNEL_ID}`;
 // Field mapping from ThingSpeak
 const FIELD_MAP = {
   field1: 'soilMoisture',   // raw analog (0–1023)
-  field2: 'rain',           // raw analog (0–1023)
+  field2: 'humidity',       // % from DHT
   field3: 'temperature',    // °C from DHT
-  field4: 'humidity',       // % from DHT
+  field4: 'rain',           // raw analog (0–4095)
   field5: 'ph',             // raw analog (0–1023)
 };
 
