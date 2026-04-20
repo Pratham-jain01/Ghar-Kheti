@@ -16,7 +16,6 @@
 
 export function validateSoil(raw) {
   if (raw === null || raw === undefined) return { isValid: false, errorType: 'error', errorMessage: 'No data received' };
-  if (raw === 0) return { isValid: false, errorType: 'warning', errorMessage: 'Check Sensor ⚠️' };
   return { isValid: true, errorType: null, errorMessage: null };
 }
 
@@ -71,7 +70,7 @@ export function interpretHumidity(raw) {
 }
 
 export function interpretPH(raw) {
-  if (raw < 1400) return { label: 'Acidic',   emoji: '🧪', color: 'warning', status: 'acidic' };
+  if (raw <= 1000) return { label: 'Acidic',   emoji: '🧪', color: 'warning', status: 'acidic' };
   if (raw <= 1600) return { label: 'Neutral',  emoji: '⚖️', color: 'good',    status: 'neutral' };
   return                  { label: 'Alkaline', emoji: '🧴', color: 'info',    status: 'alkaline' };
 }
