@@ -28,37 +28,12 @@ function formatLastUpdate(date) {
   });
 }
 
-function formatFeedTimestamp(isoDate) {
-  if (!isoDate) return '--';
-  return new Date(isoDate).toLocaleString('en-IN', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-  });
-}
-
-function formatValue(value, suffix = '') {
-  if (value === null || value === undefined || Number.isNaN(value)) return '--';
-  return `${value}${suffix}`;
-}
-
 function App() {
   const {
-    data, latest, processed, actuators, alerts, logs,
+    data, processed, actuators, alerts, logs,
     loading, error, lastFetched, isDemo, refetch,
   } = useThingSpeak(50, 5000);
   const [refreshing, setRefreshing] = useState(false);
-
-  const liveSnapshot = [
-    { id: 'soil', label: 'Soil Moisture', value: formatValue(latest?.soilMoisture), hint: 'field1' },
-    { id: 'rain', label: 'Rain Sensor', value: formatValue(latest?.rain), hint: 'field2' },
-    { id: 'temp', label: 'Temperature', value: formatValue(latest?.temperature, '°C'), hint: 'field3' },
-    { id: 'humidity', label: 'Humidity', value: formatValue(latest?.humidity, '%'), hint: 'field4' },
-    { id: 'ph', label: 'pH Sensor', value: formatValue(latest?.ph), hint: 'field5' },
-  ];
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -115,38 +90,6 @@ function App() {
             </button>
           </div>
         </header>
-
-        <section className="glass-card live-snapshot-card" id="live-snapshot">
-          <div className="live-snapshot-header">
-            <div>
-              <h2 className="live-snapshot-title">Live Feed Snapshot</h2>
-              <p className="live-snapshot-subtitle">
-                Latest values received from ThingSpeak fields.
-              </p>
-            </div>
-            <div className="live-snapshot-meta">
-              <span className={`live-source-pill ${isDemo ? 'demo' : 'live'}`}>
-                {isDemo ? 'Demo Source' : 'ThingSpeak Source'}
-              </span>
-              <span className="live-meta-chip">Feed Time: {formatFeedTimestamp(latest?.created_at)}</span>
-              <span className="live-meta-chip">Records: {data?.length ?? 0}</span>
-            </div>
-          </div>
-          <div className="live-snapshot-grid">
-            {liveSnapshot.map(item => (
-              <article key={item.id} className="live-value-card">
-                <p className="live-value-label">{item.label}</p>
-                <p className="live-value-number">{item.value}</p>
-                <p className="live-value-hint">ThingSpeak {item.hint}</p>
-              </article>
-            ))}
-          </div>
-          <p className="live-snapshot-footnote">
-            {error
-              ? `Last cloud fetch issue: ${error}. Showing fallback data where needed.`
-              : `Cloud sync healthy. Last refresh at ${formatLastUpdate(lastFetched)}.`}
-          </p>
-        </section>
 
         {/* System Status Card */}
         <SystemStatusCard
