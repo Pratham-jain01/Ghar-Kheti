@@ -147,7 +147,7 @@ const CHART_CONFIGS = [
     ],
     yDomain: [0, 3200],
     referenceLines: [
-      { y: 1400, stroke: '#ef4444', strokeDasharray: '6 4', label: 'Acidic (<1400)' },
+      { y: 1000, stroke: '#ef4444', strokeDasharray: '6 4', label: 'Acidic (<=1000)' },
       { y: 1600, stroke: '#3b82f6', strokeDasharray: '6 4', label: 'Alkaline (>1600)' },
     ],
   },
