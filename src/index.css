@@ -551,6 +551,7 @@ body {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 20px;
+  gap: 14px;
 }
 
 .chart-card-title {
@@ -564,6 +565,24 @@ body {
 
 .chart-icon {
   font-size: 1.1rem;
+}
+
+.chart-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.chart-meta-chip {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--gray-600);
+  background: var(--gray-100);
+  border: 1px solid var(--gray-200);
+  border-radius: 999px;
+  padding: 5px 10px;
 }
 
 .chart-time-selector {
@@ -594,6 +613,62 @@ body {
   background: white;
   color: var(--primary-600);
   box-shadow: var(--shadow-sm);
+}
+
+.chart-insights-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.chart-insight-card {
+  background: var(--gray-50);
+  border: 1px solid var(--gray-100);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.chart-insight-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.chart-insight-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.chart-insight-name {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--gray-700);
+}
+
+.chart-insight-trend {
+  margin-left: auto;
+  font-size: 0.66rem;
+  font-weight: 700;
+  color: var(--primary-700);
+  background: var(--primary-50);
+  border: 1px solid var(--primary-100);
+  border-radius: 999px;
+  padding: 3px 8px;
+}
+
+.chart-insight-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+}
+
+.chart-insight-values span {
+  font-size: 0.69rem;
+  color: var(--gray-600);
+  font-weight: 600;
 }
 
 .chart-placeholder {
@@ -1072,6 +1147,19 @@ body {
     flex-direction: column;
   }
 
+  .chart-card-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chart-header-actions {
+    justify-content: flex-start;
+  }
+
+  .chart-insights-grid {
+    grid-template-columns: 1fr;
+  }
+
   .actuator-grid {
     grid-template-columns: 1fr;
   }
@@ -1102,6 +1190,16 @@ body {
 
   .metric-value-status {
     font-size: 1.1rem;
+  }
+
+  .chart-time-selector {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .chart-time-btn {
+    flex: 1;
+    text-align: center;
   }
 }
 
