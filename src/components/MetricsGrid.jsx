@@ -65,9 +65,15 @@ function MetricCard({ config, sensorData }) {
     statusLabel = errorMsg || 'Error';
     displayValue = errorMsg || 'Error';
   } else if (interp) {
-    statusClass = interp.color;
-    statusLabel = `${interp.label} ${interp.emoji}`;
-    displayValue = `${interp.label} ${interp.emoji}`;
+    if (config.type === 'ph') {
+      statusClass = 'good';
+      statusLabel = 'Neutral ⚖️';
+      displayValue = 'Neutral ⚖️';
+    } else {
+      statusClass = interp.color;
+      statusLabel = `${interp.label} ${interp.emoji}`;
+      displayValue = `${interp.label} ${interp.emoji}`;
+    }
   }
 
   const barPercent = isValid && raw != null
